@@ -46,8 +46,8 @@ if ($user) {
 
 //connect to the database
 $host = 'localhost'; // hostname OR IP
-$username = 'facebook' ;//username
-$pass = 'facebook' ; //password
+$username = 'root' ;//username
+$pass = 'rh+he=my+sql' ; //password
 $dbname = 'facebook'; // database Name
 $conn = mysql_connect($host, $username, $pass) or die(mysql_error());
 if ($conn) {
@@ -71,7 +71,7 @@ function check_user($facebook_id, $installed=0) {
     $query = mysql_query("INSERT INTO users (facebook_id, username, first_name, last_name, app_installed) VALUES ('$id', '$username', '$firstname', '$lastname', '$installed')") or die(mysql_error());
     if($query){
       mysql_query("COMMIT");
-      echo 'New user added successfully!';
+      //echo 'New user added successfully!';
     } else {
       mysql_query("ROLLBACK");
       echo 'error adding the user\'s data to database';
@@ -86,7 +86,7 @@ function check_user($facebook_id, $installed=0) {
     $query = mysql_query("UPDATE users SET (username, first_name, last_name, app_installed) = ('$username', '$firstname', '$lastname', '1') WHERE facebook_id = $facebook_id") or die(mysql_error());
     if($query){
       mysql_query("COMMIT");
-      echo 'New user added successfully!';
+      //echo 'New user added successfully!';
     } else {
       mysql_query("ROLLBACK");
       echo 'error adding the user\'s data to database';
@@ -101,14 +101,14 @@ function send_data($userInfo, $userData) {
   //table: users	
   $facebook_id = $userInfo['id'];
   $username = $userInfo['username'];
-  $first_name = $userInfo['first_name'];
-  $last_name = $userInfo['last_name']; 
+  $first_name = addslashes($userInfo['first_name']);
+  $last_name = addslashes($userInfo['last_name']); 
   
   //table: user_bio
   $gender = (isset($userInfo['gender'])? $userInfo['gender']:'');
   $birthday = (isset($userInfo['birthday'])? date("Y-m-d", strtotime($userInfo['birthday'])):'');
   $email = (isset($userInfo['email'])? $userInfo ['email']:'');
-  $hometown = (isset($userInfo['hometown'])? $userInfo['hometown']['name']:'');
+  $hometown = (isset($userInfo['hometown'])? addslashes($userInfo['hometown']['name']):'');
   $language = '';
   if (isset($userInfo['languages'])) {
     $c = count($userInfo['languages']);
@@ -119,16 +119,16 @@ function send_data($userInfo, $userData) {
 	$language .= $userInfo['languages'][$i]['name'] . ', ';
     }
   }
-  $politics = (isset($userInfo['political'])? $userInfo['political']:'');
-  $religion = (isset($userInfo['religion'])? $userInfo['religion']:'');
-  $website = (isset($userInfo['website'])? $userInfo['website']:'');
+  $politics = (isset($userInfo['political'])? addslashes($userInfo['political']):'');
+  $religion = (isset($userInfo['religion'])? addslashes($userInfo['religion']):'');
+  $website = (isset($userInfo['website'])? addslashes($userInfo['website']):'');
   
   //table: user_education_history
   $education = array();
   if (isset($userInfo['education'])) {
     for($i=0; $i<count($userInfo['education']); $i++) {
       $education[$i] = array();
-      $education[$i]['school'] = (isset($userInfo['education'][$i]['school'])?$userInfo['education'][$i]['school']['name']:'');
+      $education[$i]['school'] = (isset($userInfo['education'][$i]['school'])?addslashes($userInfo['education'][$i]['school']['name']):'');
       $education[$i]['year'] = (isset($userInfo['education'][$i]['year'])?$userInfo['education'][$i]['year']['name']:'');
       $education[$i]['type'] = (isset($userInfo['education'][$i]['type'])?$userInfo['education'][$i]['type']:'');
     }
@@ -139,7 +139,7 @@ function send_data($userInfo, $userData) {
   if (isset($userData['family'])) {
     for($i=0; $i<count($userData['family']['data']); $i++) {
       $family[$i] = array();
-      $family[$i]['name'] = (isset($userData['family']['data'][$i]['name'])?$userData['family']['data'][$i]['name']:'');
+      $family[$i]['name'] = (isset($userData['family']['data'][$i]['name'])?addslashes($userData['family']['data'][$i]['name']):'');
       $family[$i]['fb_id'] = (isset($userData['family']['data'][$i]['id'])?$userData['family']['data'][$i]['id']:'');
       $family[$i]['relationship'] = (isset($userData['family']['data'][$i]['relationship'])?$userData['family']['data'][$i]['relationship']:'');
     }
@@ -150,8 +150,8 @@ function send_data($userInfo, $userData) {
   if (isset($userData['likes'])) {
     for($i=0; $i<count($userData['likes']['data']); $i++) {
       $likes[$i] = array();
-      $likes[$i]['category'] = (isset($userData['likes']['data'][$i]['category'])?$userData['likes']['data'][$i]['category']:'');
-      $likes[$i]['name'] = (isset($userData['likes']['data'][$i]['name'])?$userData['likes']['data'][$i]['name']:'');
+      $likes[$i]['category'] = (isset($userData['likes']['data'][$i]['category'])?addslashes($userData['likes']['data'][$i]['category']):'');
+      $likes[$i]['name'] = (isset($userData['likes']['data'][$i]['name'])?addslashes($userData['likes']['data'][$i]['name']):'');
       $likes[$i]['created_time'] = (isset($userData['likes']['data'][$i]['created_time'])?date('Y-m-d H:i:s', strtotime($userData['likes']['data'][$i]['created_time'])):'');
     }
   }
@@ -168,9 +168,9 @@ function send_data($userInfo, $userData) {
     for($i=0; $i<count($userData['statuses']['data']); $i++) {
       $statuses[$i] = array();
       $statuses[$i]['status_fb_id'] = (isset($userData['statuses']['data'][$i]['id'])?$userData['statuses']['data'][$i]['id']:'');
-      $statuses[$i]['message'] = (isset($userData['statuses']['data'][$i]['message'])?$userData['statuses']['data'][$i]['message']:'');
+      $statuses[$i]['message'] = (isset($userData['statuses']['data'][$i]['message'])?addslashes($userData['statuses']['data'][$i]['message']):'');
       $statuses[$i]['updated_time'] = (isset($userData['statuses']['data'][$i]['updated_time'])?date('Y-m-d H:i:s', strtotime($userData['statuses']['data'][$i]['updated_time'])):'');
-      $statuses[$i]['place'] = (isset($userData['statuses']['data'][$i]['place'])?$userData['statuses']['data'][$i]['place']['name']:'');
+      $statuses[$i]['place'] = (isset($userData['statuses']['data'][$i]['place'])?addslashes($userData['statuses']['data'][$i]['place']['name']):'');
       
       //table: user_status_tags
       $statuses[$i]['tags'] = array();
@@ -178,7 +178,7 @@ function send_data($userInfo, $userData) {
 	for($x=0; $x<count($userData['statuses']['data'][$i]['tags']['data']); $x++) {
 	  $statuses[$i]['tags'][$x] = array();
 	  $statuses[$i]['tags'][$x]['id'] = (isset($userData['statuses']['data'][$i]['tags']['data'][$x]['id'])?$userData['statuses']['data'][$i]['tags']['data'][$x]['id']:'');
-	  $statuses[$i]['tags'][$x]['name'] = (isset($userData['statuses']['data'][$i]['tags']['data'][$x]['name'])?$userData['statuses']['data'][$i]['tags']['data'][$x]['name']:'');
+	  $statuses[$i]['tags'][$x]['name'] = (isset($userData['statuses']['data'][$i]['tags']['data'][$x]['name'])?addslashes($userData['statuses']['data'][$i]['tags']['data'][$x]['name']):'');
         }
       }
       
@@ -188,7 +188,7 @@ function send_data($userInfo, $userData) {
 	for($y=0; $y<count($userData['statuses']['data'][$i]['likes']['data']); $y++) {
 	  $statuses[$i]['likes'][$y] = array();
 	  $statuses[$i]['likes'][$y]['id'] = (isset($userData['statuses']['data'][$i]['likes']['data'][$y]['id'])?$userData['statuses']['data'][$i]['likes']['data'][$y]['id']:'');
-	  $statuses[$i]['likes'][$y]['name'] = (isset($userData['statuses']['data'][$i]['likes']['data'][$y]['name'])?$userData['statuses']['data'][$i]['likes']['data'][$y]['name']:'');
+	  $statuses[$i]['likes'][$y]['name'] = (isset($userData['statuses']['data'][$i]['likes']['data'][$y]['name'])?addslashes($userData['statuses']['data'][$i]['likes']['data'][$y]['name']):'');
 	}
       }
       
@@ -202,8 +202,8 @@ function send_data($userInfo, $userData) {
 	    $statuses[$i]['comments'][$z]['comment_fb_id'] = $comment_id[1];
 	  }
 	  $statuses[$i]['comments'][$z]['id'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['from'])?$userData['statuses']['data'][$i]['comments']['data'][$z]['from']['id']:'');
-	  $statuses[$i]['comments'][$z]['name'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['from'])?$userData['statuses']['data'][$i]['comments']['data'][$z]['from']['name']:'');
-	  $statuses[$i]['comments'][$z]['message'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['message'])?$userData['statuses']['data'][$i]['comments']['data'][$z]['message']:'');
+	  $statuses[$i]['comments'][$z]['name'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['from'])?addslashes($userData['statuses']['data'][$i]['comments']['data'][$z]['from']['name']):'');
+	  $statuses[$i]['comments'][$z]['message'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['message'])?addslashes($userData['statuses']['data'][$i]['comments']['data'][$z]['message']):'');
 	  $statuses[$i]['comments'][$z]['created_time'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['created_time'])?date('Y-m-d H:i:s', strtotime($userData['statuses']['data'][$i]['comments']['data'][$z]['created_time'])):'');
 	  $statuses[$i]['comments'][$z]['like_count'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['like_count'])?$userData['statuses']['data'][$i]['comments']['data'][$z]['like_count']:'');
 	  $statuses[$i]['comments'][$z]['user_likes'] = (isset($userData['statuses']['data'][$i]['comments']['data'][$z]['user_likes'])?$userData['statuses']['data'][$i]['comments']['data'][$z]['user_likes']:'0');
@@ -217,9 +217,9 @@ function send_data($userInfo, $userData) {
   if (isset($userInfo['work'])) {
     for($i=0; $i<count($userInfo['work']); $i++) {
       $work[$i] = array();
-      $work[$i]['employer'] = (isset($userInfo['work'][$i]['employer'])?$userInfo['work'][$i]['employer']['name']:'');
-      $work[$i]['location'] = (isset($userInfo['work'][$i]['location'])?$userInfo['work'][$i]['location']['name']:'');
-      $work[$i]['position'] = (isset($userInfo['work'][$i]['position'])?$userInfo['work'][$i]['position']['name']:'');
+      $work[$i]['employer'] = (isset($userInfo['work'][$i]['employer'])?addslashes($userInfo['work'][$i]['employer']['name']):'');
+      $work[$i]['location'] = (isset($userInfo['work'][$i]['location'])?addslashes($userInfo['work'][$i]['location']['name']):'');
+      $work[$i]['position'] = (isset($userInfo['work'][$i]['position'])?addslashes($userInfo['work'][$i]['position']['name']):'');
       $work[$i]['start_date'] = (isset($userInfo['work'][$i]['start_date'])?$userInfo['work'][$i]['start_date']:'');
       $work[$i]['end_date'] = (isset($userInfo['work'][$i]['end_date'])?$userInfo['work'][$i]['end_date']:'');
     }
@@ -301,7 +301,7 @@ function send_data($userInfo, $userData) {
   //check the process
   if($q1 && $q2 && $q3 && $q4 && $q5 && $q6){
     mysql_query("COMMIT");
-    echo 'All info has been sent successfully! Thank you!';
+    echo 'All info has been sent successfully! Thank you again!';
   } else {
     mysql_query("ROLLBACK");
     echo 'error adding to database';
@@ -311,7 +311,7 @@ function send_data($userInfo, $userData) {
 
 <html>
   <head>
-    <title>Facebook App</title>
+    <title>Facebook App Test</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <style type="text/css">
         body { font-family:Verdana,"Lucida Grande",Lucida,sans-serif; font-size: 12px}
@@ -322,12 +322,14 @@ function send_data($userInfo, $userData) {
     <?php if ($user){ ?>
       <h3><?php echo ' Welcome ' . $userInfo['name'] . '!'; ?></h3>
       <?php send_data($userInfo, $userData); ?>
+      <p> </p>
+      <h3><a href="http://rohe.soic.indiana.edu/zhiptian/survey.html">Now Take Survey</a></h3>
     <?php } else { ?>
       <p>
       <strong><a href="<?php echo $loginUrl; ?>" target="_top">Allow this app to interact with my profile</a></strong>
       <br /><br />
-      This is just a simple app for testing some facebook graph API calls. After allowing this application, 
-      it can be used to post messages on your wall and do something other stuff.
+      <p>Through this application we will retrieve some basic information you have shared with Facebook.</p>
+      <p>Thank you for your participation! We really appreciate it!</p>
       </p>
     <?php } ?>								
   </body>
