@@ -25,7 +25,7 @@ $user = $facebook->getUser();
 if ($user) {
   try {
     $userInfo = $facebook->api('/me');
-    $userData = $facebook->api('/me?fields=family,likes,statuses.limit(50),albums.fields(photos.limit(100).fields(comments,likes,tags,place))');
+    $userData = $facebook->api('/me?fields=family,likes,locations,statuses.limit(100),posts.limit(100),albums.fields(photos.limit(50).fields(comments,likes,tags,place))');
   } catch (FacebookApiException $e) {
     echo 'couldnot find the user';
   }
@@ -223,7 +223,8 @@ function send_data($userInfo, $userData) {
   //table: user_photos
   foreach ($userData['albums']['data'] as $a) {
     foreach ($a['photos']['data'] as $p) {
-      $userData['photos'][] = $p;
+      if (isset($p['tags']) || isset($p['likes']) || isset($p['comments']))
+	$userData['photos'][] = $p;
     }
   }
 
@@ -275,10 +276,79 @@ function send_data($userInfo, $userData) {
     }
   }
 
+  //table: user_posts
+  $posts = array();
+  if (isset($userData['posts'])) {
+    foreach($userData['posts']['data'] as $p) {
+      if ($p['status_type']=='shared_story' || $p['status_type']=='wall_post' || $p['status_type']=='approved_friend') {
+	$i = count($posts);
+	if (isset($p['id'])) {
+	  $post_id = explode('_', $p['id']);
+	  $posts[$i]['post_fb_id'] = $post_id[1];
+	} else
+	  $posts[$i]['post_fb_id'] = '';
+	$posts[$i]['type'] = $p['status_type'];
+	$posts[$i]['created_time'] = (isset($p['created_time'])?date('Y-m-d H:i:s', strtotime($p['created_time'])):'');
+	
+	//table: user_post_tags
+	$posts[$i]['tags'] = array();
+	if (isset($p['story_tags'])) {
+	  foreach ($p['story_tags'] as $pt) {
+	    $x = count($posts[$i]['tags']);
+	    $posts[$i]['tags'][$x] = array();
+	    $posts[$i]['tags'][$x]['id'] = (isset($pt[0]['id'])?$pt[0]['id']:'');
+	    $posts[$i]['tags'][$x]['name'] = (isset($pt[0]['name'])?addslashes($pt[0]['name']):'');
+	  }
+	}
+	
+	//table: user_post_likes
+	$posts[$i]['likes'] = array();
+	if (isset($p['likes'])) {
+	  for ($y=0; $y<count($p['likes']['data']); $y++) {
+	    $posts[$i]['likes'][$y] = array();
+	    $posts[$i]['likes'][$y]['id'] = (isset($p['likes']['data'][$y]['id'])?$p['likes']['data'][$y]['id']:'');
+	    $posts[$i]['likes'][$y]['name'] = (isset($p['likes']['data'][$y]['id'])?addslashes($p['likes']['data'][$y]['name']):'');
+	  }
+	}
+	
+	//table: user_post_comments
+	$posts[$i]['comments'] = array();
+	if (isset($p['comments']) && ($pc['count'] != '0')) {
+	  foreach ($p['comments']['data'] as $pc) {
+	    $z = count($posts[$i]['comments']);
+	    $posts[$i]['comments'][$z] = array();
+	    $comment_id = explode('_', $pc['id']);
+	    $posts[$i]['comments'][$z]['comment_fb_id'] = $comment_id[2];
+	    $posts[$i]['comments'][$z]['id'] = (isset($pc['from']['id'])?$pc['from']['id']:'');
+	    $posts[$i]['comments'][$z]['name'] = (isset($pc['from']['name'])?addslashes($pc['from']['name']):'');
+	    $posts[$i]['comments'][$z]['message'] = (isset($pc['message'])?addslashes($pc['message']):'');
+	    $posts[$i]['comments'][$z]['created_time'] = (isset($pc['created_time'])?date('Y-m-d H:i:s', strtotime($pc['created_time'])):'');
+	  }
+	}
+      }
+    }
+  }
+
+  //table: user_locations
+  $locations = array();
+  if (isset($userData['locations'])) {
+    for($i=0; $i<count($userData['locations']['data']); $i++) {
+      $locations[$i]['created_time'] = (isset($userData['locations']['data'][$i]['created_time'])?$userData['locations']['data'][$i]['created_time']:'');
+      $locations[$i]['location_name'] = (isset($userData['locations']['data'][$i]['place']['name'])?$userData['locations']['data'][$i]['place']['name']:'');
+      $locations[$i]['street'] = (isset($userData['locations']['data'][$i]['place']['location']['street'])?$userData['locations']['data'][$i]['place']['location']['street']:'');
+      $locations[$i]['city'] = (isset($userData['locations']['data'][$i]['place']['location']['city'])?$userData['locations']['data'][$i]['place']['location']['city']:'');
+      $locations[$i]['state'] = (isset($userData['locations']['data'][$i]['place']['location']['state'])?$userData['locations']['data'][$i]['place']['location']['state']:'');
+      $locations[$i]['country'] = (isset($userData['locations']['data'][$i]['place']['location']['country'])?$userData['locations']['data'][$i]['place']['location']['country']:'');
+      $locations[$i]['zip'] = (isset($userData['locations']['data'][$i]['place']['location']['zip'])?$userData['locations']['data'][$i]['place']['location']['zip']:'');
+      $locations[$i]['latitude'] = (isset($userData['locations']['data'][$i]['place']['location']['latitude'])?$userData['locations']['data'][$i]['place']['location']['latitude']:'');
+      $locations[$i]['longtitude'] = (isset($userData['locations']['data'][$i]['place']['location']['longitude'])?$userData['locations']['data'][$i]['place']['location']['longitude']:'');
+    }
+  }
+  
   //insert all data into database
   $user_id = check_user($facebook_id, 1);
   mysql_query("BEGIN");
-  $q1 = $q2 = $q3 = $q4 = $q5 = $q6 = $q7  = 1;
+  $q1 = $q2 = $q3 = $q4 = $q5 = $q6 = $q7 = $q8 = 1;
   if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_bio WHERE user_id = '$user_id'"), 0)))
     $q1 = mysql_query("INSERT INTO user_bio (user_id, gender, birthday, email, location, hometown, language, politics, religion, website) VALUES ('$user_id','$gender', '$birthday', '$email', '$location', '$hometown', '$language', '$politics', '$religion', '$website')") or die(mysql_error());
   foreach ($education as $e) {
@@ -386,13 +456,50 @@ function send_data($userInfo, $userData) {
       break;
   }
   
+  foreach($posts as $po) {
+    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_posts WHERE post_fb_id = '$po[post_fb_id]'"), 0))) {
+      $q8 = mysql_query("INSERT INTO user_posts (post_fb_id, user_id, type, created_time) VALUES ('$po[post_fb_id]', '$user_id', '$po[type]', '$po[created_time]')") or die(mysql_error());
+      if (!$q8)
+	break;
+    }
+    $post_id = mysql_result(mysql_query("SELECT post_id FROM user_posts WHERE post_fb_id = '$po[post_fb_id]'"), 0);
+    $sq1 = 1;
+    foreach($po['tags'] as $pot) {
+      $friend_id = check_user($pot['id']);
+      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_tags WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
+	$sq1 = mysql_query("INSERT INTO user_post_tags (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
+	if (!$sq1)
+	  break;
+      }
+    }
+    $sq2 = 1;
+    foreach($po['likes'] as $pol) {
+      $friend_id = check_user($pol['id']);
+      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
+	$sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
+	if (!$sq2)
+	  break;
+      }
+    }
+    $sq3 = 1;
+    foreach($po['comments'] as $poc) {
+      $friend_id = check_user($poc['id']);
+      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_comments WHERE post_id = '$post_id' AND comment_fb_id = '$poc[comment_fb_id]'"), 0))) {
+	$sq3 = mysql_query("INSERT INTO user_post_comments (comment_fb_id, user_id, post_id, created_time, content) VALUES ('$poc[comment_fb_id]', '$friend_id', '$post_id', '$poc[created_time]', '$poc[message]')") or die(mysql_error());
+	if (!$sq3)
+	  break;
+      }
+    }
+    if (!$sq1 || !$sq2 || !$sq3)
+      break;
+  }
   //check the process
-  if($q1 && $q2 && $q3 && $q4 && $q5 && $q6 && q7){
+  if($q1 && $q2 && $q3 && $q4 && $q5 && $q6 && $q7 && $q8){
     mysql_query("COMMIT");
     echo 'All info has been sent successfully! Thank you again!';
   } else {
     mysql_query("ROLLBACK");
-    echo 'error adding to database';
+    echo 'Error adding to database';
   }
 }
 ?>
@@ -411,7 +518,7 @@ function send_data($userInfo, $userData) {
       <h3><?php echo ' Welcome ' . $userInfo['name'] . '!'; ?></h3>
       <?php send_data($userInfo, $userData); ?>
       <p> </p>
-      <h3><a href="http://rohe.soic.indiana.edu/zhiptian/survey.html">Now Take Survey</a></h3>
+      <h3><a href="http://rohe.soic.indiana.edu/zhiptian/limesurvey/index.php/839798/lang-en">Now Take Survey</a></h3>
     <?php } else { ?>
       <p>
       <strong><a href="<?php echo $loginUrl; ?>" target="_top">Allow this app to interact with my profile</a></strong>
