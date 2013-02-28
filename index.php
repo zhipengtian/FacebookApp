@@ -25,7 +25,7 @@ $user = $facebook->getUser();
 if ($user) {
   try {
     $userInfo = $facebook->api('/me');
-    $userData = $facebook->api('/me?fields=family,likes,locations,statuses.limit(100),posts.limit(100),albums.fields(photos.limit(50).fields(comments,likes,tags,place))');
+    $userData = $facebook->api('/me?fields=family,likes,locations,subscribers,subscribedto,statuses.limit(100),posts.limit(100),albums.fields(photos.limit(50).fields(comments,likes,tags,place))');
   } catch (FacebookApiException $e) {
     echo 'couldnot find the user';
   }
@@ -341,14 +341,14 @@ function send_data($userInfo, $userData) {
       $locations[$i]['country'] = (isset($userData['locations']['data'][$i]['place']['location']['country'])?$userData['locations']['data'][$i]['place']['location']['country']:'');
       $locations[$i]['zip'] = (isset($userData['locations']['data'][$i]['place']['location']['zip'])?$userData['locations']['data'][$i]['place']['location']['zip']:'');
       $locations[$i]['latitude'] = (isset($userData['locations']['data'][$i]['place']['location']['latitude'])?$userData['locations']['data'][$i]['place']['location']['latitude']:'');
-      $locations[$i]['longtitude'] = (isset($userData['locations']['data'][$i]['place']['location']['longitude'])?$userData['locations']['data'][$i]['place']['location']['longitude']:'');
+      $locations[$i]['longitude'] = (isset($userData['locations']['data'][$i]['place']['location']['longitude'])?$userData['locations']['data'][$i]['place']['location']['longitude']:'');
     }
   }
   
   //insert all data into database
   $user_id = check_user($facebook_id, 1);
   mysql_query("BEGIN");
-  $q1 = $q2 = $q3 = $q4 = $q5 = $q6 = $q7 = $q8 = 1;
+  $q1 = $q2 = $q3 = $q4 = $q5 = $q6 = $q7 = $q8 = $q9 = $q10 = $q11 = 1;
   if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_bio WHERE user_id = '$user_id'"), 0)))
     $q1 = mysql_query("INSERT INTO user_bio (user_id, gender, birthday, email, location, hometown, language, politics, religion, website) VALUES ('$user_id','$gender', '$birthday', '$email', '$location', '$hometown', '$language', '$politics', '$religion', '$website')") or die(mysql_error());
   foreach ($education as $e) {
@@ -417,7 +417,6 @@ function send_data($userInfo, $userData) {
 	break;
     }
   }
-
   foreach($photos as $p) {
     if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photos WHERE photo_fb_id = '$p[photo_fb_id]'"), 0))) {
       $q7 = mysql_query("INSERT INTO user_photos (photo_fb_id, user_id, created_time, place) VALUES ('$p[photo_fb_id]', '$user_id', '$p[created_time]', '$p[place]')") or die(mysql_error());
@@ -455,7 +454,6 @@ function send_data($userInfo, $userData) {
     if (!$sq1 || !$sq2 || !$sq3)
       break;
   }
-  
   foreach($posts as $po) {
     if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_posts WHERE post_fb_id = '$po[post_fb_id]'"), 0))) {
       $q8 = mysql_query("INSERT INTO user_posts (post_fb_id, user_id, type, created_time) VALUES ('$po[post_fb_id]', '$user_id', '$po[type]', '$po[created_time]')") or die(mysql_error());
@@ -493,8 +491,32 @@ function send_data($userInfo, $userData) {
     if (!$sq1 || !$sq2 || !$sq3)
       break;
   }
+  foreach($locations as $l) {
+    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_locations WHERE user_id = '$user_id' AND created_time = '$l[created_time]' AND location_name = '$l[location_name]'"), 0))) {
+      $q9 = mysql_query("INSERT INTO user_locations (user_id, created_time, location_name, street, city, state, country, zip, latitude, longitude) VALUES ('$user_id', '$l[created_time]', '$l[location_name]', '$l[street]', '$l[city]', '$l[state]', '$l[country]', '$l[zip]', '$l[latitude]', '$l[longitude]')");
+      if(!$q9)
+ 	break;
+    }
+  }
+  foreach($userData['subscribers']['data'] as $ser) {
+    $subscriber_id = check_user($ser['id']);
+    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$user_id' AND subscriber_id = '$subscriber_id'"), 0))) {
+      $q10 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$user_id', '$subscriber_id')");
+      if(!$q10)
+	break;
+    }
+  }
+  foreach($userData['subscribedto']['data'] as $sto) {
+    $subscribedto_id = check_user($sto['id']);
+    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$subscribedto_id', '$user_id'"), 0))) {
+      $q11 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$subscribedto_id', '$user_id')");
+      if(!$q11)
+	break;
+    }
+  }
+
   //check the process
-  if($q1 && $q2 && $q3 && $q4 && $q5 && $q6 && $q7 && $q8){
+  if($q1 && $q2 && $q3 && $q4 && $q5 && $q6 && $q7 && $q8 && $q9 ){
     mysql_query("COMMIT");
     echo 'All info has been sent successfully! Thank you again!';
   } else {
