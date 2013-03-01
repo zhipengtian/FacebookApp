@@ -83,7 +83,7 @@ function check_user($facebook_id, $installed=0) {
     $lastname = (isset($userInfo['last_name'])?$userInfo['last_name']:'');
     
     mysql_query("BEGIN");
-    $query = mysql_query("UPDATE users SET (username, first_name, last_name, app_installed) = ('$username', '$firstname', '$lastname', '1') WHERE facebook_id = $facebook_id") or die(mysql_error());
+    $query = mysql_query("UPDATE users SET username = '$username', first_name = '$firstname', last_name = '$lastname', app_installed = '1' WHERE facebook_id = $facebook_id") or die(mysql_error());
     if($query){
       mysql_query("COMMIT");
       //echo 'New user added successfully!';
@@ -245,7 +245,7 @@ function send_data($userInfo, $userData) {
 	  $photos[$i]['tags'][$x]['name'] = (isset($userData['photos'][$i]['tags']['data'][$x]['name'])?addslashes($userData['photos'][$i]['tags']['data'][$x]['name']):'');
         }
       }
-      
+
       //table: user_photo_likes
       $photos[$i]['likes'] = array();
       if (isset($userData['photos'][$i]['likes'])) {
@@ -255,7 +255,7 @@ function send_data($userInfo, $userData) {
 	  $photos[$i]['likes'][$y]['name'] = (isset($userData['photos'][$i]['likes']['data'][$y]['name'])?addslashes($userData['photos'][$i]['likes']['data'][$y]['name']):'');
 	}
       }
-
+      
       //table: user_photo_comments
       $photos[$i]['comments'] = array();
       if (isset($userData['photos'][$i]['comments'])) {
@@ -334,11 +334,11 @@ function send_data($userInfo, $userData) {
   if (isset($userData['locations'])) {
     for($i=0; $i<count($userData['locations']['data']); $i++) {
       $locations[$i]['created_time'] = (isset($userData['locations']['data'][$i]['created_time'])?$userData['locations']['data'][$i]['created_time']:'');
-      $locations[$i]['location_name'] = (isset($userData['locations']['data'][$i]['place']['name'])?$userData['locations']['data'][$i]['place']['name']:'');
-      $locations[$i]['street'] = (isset($userData['locations']['data'][$i]['place']['location']['street'])?$userData['locations']['data'][$i]['place']['location']['street']:'');
-      $locations[$i]['city'] = (isset($userData['locations']['data'][$i]['place']['location']['city'])?$userData['locations']['data'][$i]['place']['location']['city']:'');
-      $locations[$i]['state'] = (isset($userData['locations']['data'][$i]['place']['location']['state'])?$userData['locations']['data'][$i]['place']['location']['state']:'');
-      $locations[$i]['country'] = (isset($userData['locations']['data'][$i]['place']['location']['country'])?$userData['locations']['data'][$i]['place']['location']['country']:'');
+      $locations[$i]['location_name'] = (isset($userData['locations']['data'][$i]['place']['name'])?addslashes($userData['locations']['data'][$i]['place']['name']):'');
+      $locations[$i]['street'] = (isset($userData['locations']['data'][$i]['place']['location']['street'])?addslashes($userData['locations']['data'][$i]['place']['location']['street']):'');
+      $locations[$i]['city'] = (isset($userData['locations']['data'][$i]['place']['location']['city'])?addslashes($userData['locations']['data'][$i]['place']['location']['city']):'');
+      $locations[$i]['state'] = (isset($userData['locations']['data'][$i]['place']['location']['state'])?addslashes($userData['locations']['data'][$i]['place']['location']['state']):'');
+      $locations[$i]['country'] = (isset($userData['locations']['data'][$i]['place']['location']['country'])?addslashes($userData['locations']['data'][$i]['place']['location']['country']):'');
       $locations[$i]['zip'] = (isset($userData['locations']['data'][$i]['place']['location']['zip'])?$userData['locations']['data'][$i]['place']['location']['zip']:'');
       $locations[$i]['latitude'] = (isset($userData['locations']['data'][$i]['place']['location']['latitude'])?$userData['locations']['data'][$i]['place']['location']['latitude']:'');
       $locations[$i]['longitude'] = (isset($userData['locations']['data'][$i]['place']['location']['longitude'])?$userData['locations']['data'][$i]['place']['location']['longitude']:'');
@@ -359,12 +359,14 @@ function send_data($userInfo, $userData) {
     }
   }
   foreach ($family as $f) {
-    $member_id = check_user($f['fb_id']);
-    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_family WHERE user1_id = '$user_id' AND user2_id = '$member_id'"), 0))) {
-      $q3 = mysql_query("INSERT INTO user_family (user1_id, user2_id, relationship) VALUES ('$user_id', '$member_id', '$f[relationship]')") or die(mysql_error());
-      if (!$q3)
+    if ($f['fb_id']) {
+      $member_id = check_user($f['fb_id']);
+      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_family WHERE user1_id = '$user_id' AND user2_id = '$member_id'"), 0))) {
+	$q3 = mysql_query("INSERT INTO user_family (user1_id, user2_id, relationship) VALUES ('$user_id', '$member_id', '$f[relationship]')") or die(mysql_error());
+	if (!$q3)
 	break;
-    }	
+      }	
+    }
   }
   foreach($likes as $l) {
     if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_likes WHERE user_id = '$user_id' AND name = '$l[name]'"), 0))) {
@@ -376,35 +378,43 @@ function send_data($userInfo, $userData) {
   foreach($statuses as $s) {
     if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_statuses WHERE status_fb_id = '$s[status_fb_id]'"), 0))) {
       $q5 = mysql_query("INSERT INTO user_statuses (status_fb_id, user_id, content, created_time, place) VALUES ('$s[status_fb_id]', '$user_id', '$s[message]', '$s[updated_time]', '$s[place]')") or die(mysql_error());
-      if (!$q5)
+      if (!$q5) {
+	echo "status broke!!!";
 	break;
+      }
     }
     $status_id = mysql_result(mysql_query("SELECT status_id FROM user_statuses WHERE status_fb_id = '$s[status_fb_id]'"), 0);
     $sq1 = 1;
     foreach($s['tags'] as $st) {
-      $friend_id = check_user($st['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_status_tags WHERE status_id = '$status_id' AND user_id = '$friend_id'"), 0))) {
-	$sq1 = mysql_query("INSERT INTO user_status_tags (user_id, status_id) VALUES ('$friend_id', '$status_id')") or die(mysql_error());
-	if (!$sq1)
-	  break;
+      if ($st['id']) {
+	$friend_id = check_user($st['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_status_tags WHERE status_id = '$status_id' AND user_id = '$friend_id'"), 0))) {
+	  $sq1 = mysql_query("INSERT INTO user_status_tags (user_id, status_id) VALUES ('$friend_id', '$status_id')") or die(mysql_error());
+	  if (!$sq1)
+	    break;
+	}
       }
     }
     $sq2 = 1;
     foreach($s['likes'] as $sl) {
-      $friend_id = check_user($sl['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_status_likes WHERE status_id = '$status_id' AND user_id = '$friend_id'"), 0))) {
-	$sq2 = mysql_query("INSERT INTO user_status_likes (user_id, status_id) VALUES ('$friend_id', '$status_id')") or die(mysql_error());
-	if (!$sq2)
-	  break;
+      if ($sl['id']) {
+	$friend_id = check_user($sl['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_status_likes WHERE status_id = '$status_id' AND user_id = '$friend_id'"), 0))) {
+	  $sq2 = mysql_query("INSERT INTO user_status_likes (user_id, status_id) VALUES ('$friend_id', '$status_id')") or die(mysql_error());
+	  if (!$sq2)
+	    break;
+	}
       }
     }
     $sq3 = 1;
     foreach($s['comments'] as $sc) {
-      $friend_id = check_user($sc['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_status_comments WHERE status_id = '$status_id' AND comment_fb_id = '$sc[comment_fb_id]'"), 0))) {
-	$sq3 = mysql_query("INSERT INTO user_status_comments (comment_fb_id, user_id, status_id, created_time, content, like_count, user_likes) VALUES ('$sc[comment_fb_id]', '$friend_id', '$status_id', '$sc[created_time]', '$sc[message]', '$sc[like_count]', '$sc[user_likes]')") or die(mysql_error());
-	if (!$sq3)
-	  break;
+      if ($sc['id']) {
+	$friend_id = check_user($sc['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_status_comments WHERE status_id = '$status_id' AND comment_fb_id = '$sc[comment_fb_id]'"), 0))) {
+	  $sq3 = mysql_query("INSERT INTO user_status_comments (comment_fb_id, user_id, status_id, created_time, content, like_count, user_likes) VALUES ('$sc[comment_fb_id]', '$friend_id', '$status_id', '$sc[created_time]', '$sc[message]', '$sc[like_count]', '$sc[user_likes]')") or die(mysql_error());
+	  if (!$sq3)
+	    break;
+	}
       }
     }
     if (!$sq1 || !$sq2 || !$sq3)
@@ -426,29 +436,35 @@ function send_data($userInfo, $userData) {
     $photo_id = mysql_result(mysql_query("SELECT photo_id FROM user_photos WHERE photo_fb_id = '$p[photo_fb_id]'"), 0);
     $sq1 = 1;
     foreach($p['tags'] as $pt) {
-      $friend_id = check_user($pt['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_tags WHERE photo_id = '$photo_id' AND user_id = '$friend_id'"), 0))) {
-	$sq1 = mysql_query("INSERT INTO user_photo_tags (user_id, photo_id) VALUES ('$friend_id', '$photo_id')") or die(mysql_error());
-	if (!$sq1)
-	  break;
+      if($pt['id']) {
+	$friend_id = check_user($pt['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_tags WHERE photo_id = '$photo_id' AND user_id = '$friend_id'"), 0))) {
+	  $sq1 = mysql_query("INSERT INTO user_photo_tags (user_id, photo_id) VALUES ('$friend_id', '$photo_id')") or die(mysql_error());
+	  if (!$sq1)
+	    break;
+	}
       }
     }
     $sq2 = 1;
     foreach($p['likes'] as $pl) {
-      $friend_id = check_user($pl['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_likes WHERE photo_id = '$photo_id' AND user_id = '$friend_id'"), 0))) {
-	$sq2 = mysql_query("INSERT INTO user_photo_likes (user_id, photo_id) VALUES ('$friend_id', '$photo_id')") or die(mysql_error());
-	if (!$sq2)
-	  break;
+      if($pl['id']) {
+	$friend_id = check_user($pl['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_likes WHERE photo_id = '$photo_id' AND user_id = '$friend_id'"), 0))) {
+	  $sq2 = mysql_query("INSERT INTO user_photo_likes (user_id, photo_id) VALUES ('$friend_id', '$photo_id')") or die(mysql_error());
+	  if (!$sq2)
+	    break;
+	}
       }
     }
     $sq3 = 1;
     foreach($p['comments'] as $pc) {
-      $friend_id = check_user($pc['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_comments WHERE photo_id = '$photo_id' AND comment_fb_id = '$pc[comment_fb_id]'"), 0))) {
-	$sq3 = mysql_query("INSERT INTO user_photo_comments (comment_fb_id, user_id, photo_id, created_time, content, like_count, user_likes) VALUES ('$pc[comment_fb_id]', '$friend_id', '$photo_id', '$pc[created_time]', '$pc[message]', '$pc[like_count]', '$pc[user_likes]')") or die(mysql_error());
-	if (!$sq3)
-	  break;
+      if ($pc['id']) {
+	$friend_id = check_user($pc['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_comments WHERE photo_id = '$photo_id' AND comment_fb_id = '$pc[comment_fb_id]'"), 0))) {
+	  $sq3 = mysql_query("INSERT INTO user_photo_comments (comment_fb_id, user_id, photo_id, created_time, content, like_count, user_likes) VALUES ('$pc[comment_fb_id]', '$friend_id', '$photo_id', '$pc[created_time]', '$pc[message]', '$pc[like_count]', '$pc[user_likes]')") or die(mysql_error());
+	  if (!$sq3)
+	    break;
+	}
       }
     }
     if (!$sq1 || !$sq2 || !$sq3)
@@ -463,29 +479,35 @@ function send_data($userInfo, $userData) {
     $post_id = mysql_result(mysql_query("SELECT post_id FROM user_posts WHERE post_fb_id = '$po[post_fb_id]'"), 0);
     $sq1 = 1;
     foreach($po['tags'] as $pot) {
-      $friend_id = check_user($pot['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_tags WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
-	$sq1 = mysql_query("INSERT INTO user_post_tags (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
-	if (!$sq1)
-	  break;
+      if ($pot['id']) {
+	$friend_id = check_user($pot['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_tags WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
+	  $sq1 = mysql_query("INSERT INTO user_post_tags (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
+	  if (!$sq1)
+	    break;
+	}
       }
     }
     $sq2 = 1;
     foreach($po['likes'] as $pol) {
-      $friend_id = check_user($pol['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
-	$sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
-	if (!$sq2)
-	  break;
+      if ($pol['id']) {
+	$friend_id = check_user($pol['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
+	  $sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
+	  if (!$sq2)
+	    break;
+	}
       }
     }
     $sq3 = 1;
     foreach($po['comments'] as $poc) {
-      $friend_id = check_user($poc['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_comments WHERE post_id = '$post_id' AND comment_fb_id = '$poc[comment_fb_id]'"), 0))) {
-	$sq3 = mysql_query("INSERT INTO user_post_comments (comment_fb_id, user_id, post_id, created_time, content) VALUES ('$poc[comment_fb_id]', '$friend_id', '$post_id', '$poc[created_time]', '$poc[message]')") or die(mysql_error());
-	if (!$sq3)
-	  break;
+      if ($poc['id']) {
+	$friend_id = check_user($poc['id']);
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_comments WHERE post_id = '$post_id' AND comment_fb_id = '$poc[comment_fb_id]'"), 0))) {
+	  $sq3 = mysql_query("INSERT INTO user_post_comments (comment_fb_id, user_id, post_id, created_time, content) VALUES ('$poc[comment_fb_id]', '$friend_id', '$post_id', '$poc[created_time]', '$poc[message]')") or die(mysql_error());
+	  if (!$sq3)
+	    break;
+	}
       }
     }
     if (!$sq1 || !$sq2 || !$sq3)
@@ -499,24 +521,28 @@ function send_data($userInfo, $userData) {
     }
   }
   foreach($userData['subscribers']['data'] as $ser) {
-    $subscriber_id = check_user($ser['id']);
-    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$user_id' AND subscriber_id = '$subscriber_id'"), 0))) {
-      $q10 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$user_id', '$subscriber_id')");
-      if(!$q10)
-	break;
+    if ($ser['id']) {
+      $subscriber_id = check_user($ser['id']);
+      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$user_id' AND subscriber_id = '$subscriber_id'"), 0))) {
+	$q10 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$user_id', '$subscriber_id')");
+	if(!$q10)
+	  break;
+      }
     }
   }
   foreach($userData['subscribedto']['data'] as $sto) {
-    $subscribedto_id = check_user($sto['id']);
-    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$subscribedto_id', '$user_id'"), 0))) {
-      $q11 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$subscribedto_id', '$user_id')");
-      if(!$q11)
-	break;
+    if ($sto['id']) {
+      $subscribedto_id = check_user($sto['id']);
+      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$subscribedto_id', '$user_id'"), 0))) {
+	$q11 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$subscribedto_id', '$user_id')");
+	if(!$q11)
+	  break;
+      }
     }
   }
 
   //check the process
-  if($q1 && $q2 && $q3 && $q4 && $q5 && $q6 && $q7 && $q8 && $q9 ){
+  if($q1 && $q2 && $q3 && $q4 && $q5 && $q6 && $q7 && $q8 && $q9 && $q10 && $q11){
     mysql_query("COMMIT");
     echo 'All info has been sent successfully! Thank you again!';
   } else {
