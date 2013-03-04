@@ -25,7 +25,7 @@ $user = $facebook->getUser();
 if ($user) {
   try {
     $userInfo = $facebook->api('/me');
-    $userData = $facebook->api('/me?fields=family,likes,locations,subscribers,subscribedto,statuses.limit(100),posts.limit(100),albums.fields(photos.limit(50).fields(comments,likes,tags,place))');
+    $userData = $facebook->api('/me?fields=family,likes,locations,subscribers,subscribedto,statuses.limit(100),posts.limit(100),albums.fields(photos.limit(50).fields(comments,likes,tags,place)),friendlists.fields(members,name,list_type)');
   } catch (FacebookApiException $e) {
     echo 'couldnot find the user';
   }
@@ -345,6 +345,23 @@ function send_data($userInfo, $userData) {
     }
   }
   
+  //table: user_friendlists
+  $friendlists = array();
+  if (isset($userData['friendlists'])) {
+    foreach($userData['friendlists']['data'] as $f) {
+      if (isset($f['members'])) {
+	$i = count($friendlists);
+	$friendlists[$i]['id'] = (isset($f['id'])?$f['id']:'');
+	$friendlists[$i]['name'] = (isset($f['name'])?$f['name']:'');
+	$friendlists[$i]['list_type'] = (isset($f['list_type'])?$f['list_type']:'');
+	for($c=0; $c<count($f['members']['data']); $c++) {
+	  $friendlists[$i]['members'][$c]['id'] = (isset($f['members']['data'][$c]['id'])?$f['members']['data'][$c]['id']:'');
+	  $friendlists[$i]['members'][$c]['name'] = (isset($f['members']['data'][$c]['name'])?$f['members']['data'][$c]['name']:'');
+	}
+      }
+    }
+  } 
+
   //insert all data into database
   $user_id = check_user($facebook_id, 1);
   mysql_query("BEGIN");
