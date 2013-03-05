@@ -75,7 +75,7 @@ function check_user($facebook_id, $installed=0) {
       mysql_query("ROLLBACK");
       echo 'error adding the user\'s data to database';
     }
-  } else if ((mysql_result(mysql_query("SELECT app_installed FROM users WHERE facebook_id = $facebook_id"), 0)!=1) && ($installed==1)) {
+  } else if ((mysql_result(mysql_query("SELECT app_installed FROM users WHERE facebook_id = '$facebook_id'"), 0)!=1) && ($installed==1)) {
     $userInfo = $facebook->api('/'.$facebook_id);
     $username = (isset($userInfo['username'])?$userInfo['username']:'');
     $firstname = (isset($userInfo['first_name'])?$userInfo['first_name']:'');
@@ -91,7 +91,7 @@ function check_user($facebook_id, $installed=0) {
       echo 'error adding the user\'s data to database';
     }
   }
-  $user_id = mysql_result(mysql_query("SELECT id FROM users WHERE facebook_id = $facebook_id"), 0);
+  $user_id = mysql_result(mysql_query("SELECT id FROM users WHERE facebook_id = '$facebook_id'"), 0);
   return $user_id;
 }
 
@@ -172,63 +172,6 @@ function send_data($userInfo, $userData) {
       }	
     }
   }
-  
-  
-
-  //table: user_posts
-  $posts = array();
-  if (isset($userData['posts'])) {
-    foreach($userData['posts']['data'] as $p) {
-      if (isset($p['status_type']) && ($p['status_type']=='shared_story' || $p['status_type']=='wall_post' || $p['status_type']=='approved_friend')) {
-	$i = count($posts);
-	if (isset($p['id'])) {
-	  $post_id = explode('_', $p['id']);
-	  $posts[$i]['post_fb_id'] = $post_id[1];
-	} else
-	  $posts[$i]['post_fb_id'] = '';
-	$posts[$i]['type'] = $p['status_type'];
-	$posts[$i]['created_time'] = (isset($p['created_time'])?date('Y-m-d H:i:s', strtotime($p['created_time'])):'');
-	
-	//table: user_post_tags
-	$posts[$i]['tags'] = array();
-	if (isset($p['story_tags'])) {
-	  foreach ($p['story_tags'] as $pt) {
-	    $x = count($posts[$i]['tags']);
-	    $posts[$i]['tags'][$x] = array();
-	    $posts[$i]['tags'][$x]['id'] = (isset($pt[0]['id'])?$pt[0]['id']:'');
-	    $posts[$i]['tags'][$x]['name'] = (isset($pt[0]['name'])?addslashes($pt[0]['name']):'');
-	  }
-	}
-	
-	//table: user_post_likes
-	$posts[$i]['likes'] = array();
-	if (isset($p['likes'])) {
-	  for ($y=0; $y<count($p['likes']['data']); $y++) {
-	    $posts[$i]['likes'][$y] = array();
-	    $posts[$i]['likes'][$y]['id'] = (isset($p['likes']['data'][$y]['id'])?$p['likes']['data'][$y]['id']:'');
-	    $posts[$i]['likes'][$y]['name'] = (isset($p['likes']['data'][$y]['id'])?addslashes($p['likes']['data'][$y]['name']):'');
-	  }
-	}
-	
-	//table: user_post_comments
-	$posts[$i]['comments'] = array();
-	if (isset($p['comments']) && ($p['comments']['count'] != '0')) {
-	  foreach ($p['comments']['data'] as $pc) {
-	    $z = count($posts[$i]['comments']);
-	    $posts[$i]['comments'][$z] = array();
-	    $comment_id = explode('_', $pc['id']);
-	    $posts[$i]['comments'][$z]['comment_fb_id'] = $comment_id[2];
-	    $posts[$i]['comments'][$z]['id'] = (isset($pc['from']['id'])?$pc['from']['id']:'');
-	    $posts[$i]['comments'][$z]['name'] = (isset($pc['from']['name'])?addslashes($pc['from']['name']):'');
-	    $posts[$i]['comments'][$z]['message'] = (isset($pc['message'])?addslashes($pc['message']):'');
-	    $posts[$i]['comments'][$z]['created_time'] = (isset($pc['created_time'])?date('Y-m-d H:i:s', strtotime($pc['created_time'])):'');
-	  }
-	}
-      }
-    }
-  }
-
-  
   
   //insert all data into database
   $user_id = check_user($facebook_id, 1);
@@ -377,7 +320,7 @@ function send_data($userInfo, $userData) {
   //table: user_photos
   if (isset($userData['albums'])) {
     foreach($userData['albums']['data'] as $a) {
-      foreach($a['photots']['data'] as $p) {
+      foreach($a['photos']['data'] as $p) {
 	if (isset($p['tags']) || isset($p['likes']) || isset($p['comments'])) {
 	  $fb_id = (isset($p['id'])?$p['id']:'');
 	  $created_time = (isset($p['created_time'])?date('Y-m-d H:i:s', strtotime($p['created_time'])):'');
@@ -441,50 +384,78 @@ function send_data($userInfo, $userData) {
     }
   }
   
-  foreach($posts as $po) {
-    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_posts WHERE post_fb_id = '$po[post_fb_id]'"), 0))) {
-      $q8 = mysql_query("INSERT INTO user_posts (post_fb_id, user_id, type, created_time) VALUES ('$po[post_fb_id]', '$user_id', '$po[type]', '$po[created_time]')") or die(mysql_error());
-      if (!$q8)
-	break;
-    }
-    $post_id = mysql_result(mysql_query("SELECT post_id FROM user_posts WHERE post_fb_id = '$po[post_fb_id]'"), 0);
-    $sq1 = 1;
-    foreach($po['tags'] as $pot) {
-      if ($pot['id']) {
-	$friend_id = check_user($pot['id']);
-	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_tags WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
-	  $sq1 = mysql_query("INSERT INTO user_post_tags (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
-	  if (!$sq1)
+  //table: user_posts
+  if (isset($userData['posts'])) {
+    foreach($userData['posts']['data'] as $p) {
+      if (isset($p['status_type']) && ($p['status_type']=='shared_story' || $p['status_type']=='wall_post' || $p['status_type']=='approved_friend')) {
+	if (isset($p['id'])) {
+	  $post_id = explode('_', $p['id']);
+	  $post_fb_id = $post_id[1];
+	} else
+	  $post_fb_id = '';
+	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_posts WHERE post_fb_id = '$post_fb_id'"), 0))) {
+	  $created_time = (isset($p['created_time'])?date('Y-m-d H:i:s', strtotime($p['created_time'])):'');
+	  $q8 = mysql_query("INSERT INTO user_posts (post_fb_id, user_id, type, created_time) VALUES ('$post_fb_id', '$user_id', '$p[status_type]', '$created_time')") or die(mysql_error());
+	  if (!$q8)
 	    break;
 	}
-      }
-    }
-    $sq2 = 1;
-    foreach($po['likes'] as $pol) {
-      if ($pol['id']) {
-	$friend_id = check_user($pol['id']);
-	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
-	  $sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
-	  if (!$sq2)
-	    break;
+	//table: user_post_tags
+	$post_id = mysql_result(mysql_query("SELECT post_id FROM user_posts WHERE post_fb_id = '$post_fb_id'"), 0);
+	$sq1 = 1;
+	if (isset($p['story_tags'])) {
+	  foreach($p['story_tags'] as $pt) {
+	    foreach($pt as $ppt) {
+	      if ($ppt['id']) {
+		$friend_id = check_user($ppt['id']);
+		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_tags WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
+		  $sq1 = mysql_query("INSERT INTO user_post_tags (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
+		  if (!$sq1)
+		    break;
+		}
+	      }
+	    }
+	  }
 	}
-      }
-    }
-    $sq3 = 1;
-    foreach($po['comments'] as $poc) {
-      if ($poc['id']) {
-	$friend_id = check_user($poc['id']);
-	if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_comments WHERE post_id = '$post_id' AND comment_fb_id = '$poc[comment_fb_id]'"), 0))) {
-	  $sq3 = mysql_query("INSERT INTO user_post_comments (comment_fb_id, user_id, post_id, created_time, content) VALUES ('$poc[comment_fb_id]', '$friend_id', '$post_id', '$poc[created_time]', '$poc[message]')") or die(mysql_error());
-	  if (!$sq3)
-	    break;
+	//table: user_post_likes
+	$sq2 = 1;
+	if (isset($p['likes'])) {
+	  foreach($p['likes'] as $pl) {
+	    foreach($pl as $ppl) {
+	      if ($ppl['id']) {
+		$friend_id = check_user($ppl['id']);
+		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
+		  $sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
+		  if (!$sq2)
+		    break;
+		}
+	      }
+	    }
+	  }
 	}
+	//table: user_post_comments
+	$sq3 = 1;
+	if (isset($p['comments']) && $p['comments']['count'] != 0) {
+	  foreach($p['comments']['data'] as $pc) {
+	    if ($pc['from']['id']) {
+	      $friend_id = check_user($pc['from']['id']);
+	      $comment_id = explode('_', $pc['id']);
+	      $comment_fb_id = $comment_id[2];
+	      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_comments WHERE post_id = '$post_id' AND comment_fb_id = '$comment_fb_id'"), 0))) {
+		$created_time = (isset($pc['created_time'])?date('Y-m-d H:i:s', strtotime($pc['created_time'])):'');
+		$message = (isset($pc['message'])?addslashes($pc['message']):'');
+		$sq3 = mysql_query("INSERT INTO user_post_comments (comment_fb_id, user_id, post_id, created_time, content) VALUES ('$comment_fb_id', '$friend_id', '$post_id', '$created_time', '$message')") or die(mysql_error());
+		if (!$sq3)
+		  break;
+	      }
+	    }
+	  }
+	}
+	if (!$sq1 || !$sq2 || !$sq3)
+	  break;
       }
     }
-    if (!$sq1 || !$sq2 || !$sq3)
-      break;
   }
-
+  
   //table: user_locations
   if (isset($userData['locations'])) {
     foreach($userData['locations']['data'] as $l) {
