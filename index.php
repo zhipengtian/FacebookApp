@@ -26,7 +26,7 @@ if ($user) {
   try {
     $userInfo = $facebook->api('/me');
     $userData = $facebook->api('/me?fields=family,likes,locations,subscribers,subscribedto,statuses.limit(100),posts.limit(100),albums.fields(photos.limit(50).fields(comments,likes,tags,place)),friendlists.fields(members,name,list_type)');
-  } catch (FacebookApiException $e) {
+	} catch (FacebookApiException $e) {
     echo 'couldnot find the user';
   }
 } else {
@@ -47,7 +47,7 @@ if ($user) {
 //connect to the database
 $host = 'localhost'; // hostname OR IP
 $username = 'root' ;//username
-$pass = 'rh+he=my+sql' ; //password
+$pass = '' ; //password
 $dbname = 'facebook'; // database Name
 $conn = mysql_connect($host, $username, $pass) or die(mysql_error());
 if ($conn) {
@@ -280,15 +280,15 @@ function send_data($userInfo, $userData) {
   $posts = array();
   if (isset($userData['posts'])) {
     foreach($userData['posts']['data'] as $p) {
-      if ($p['status_type']=='shared_story' || $p['status_type']=='wall_post' || $p['status_type']=='approved_friend') {
-	$i = count($posts);
-	if (isset($p['id'])) {
-	  $post_id = explode('_', $p['id']);
-	  $posts[$i]['post_fb_id'] = $post_id[1];
-	} else
-	  $posts[$i]['post_fb_id'] = '';
-	$posts[$i]['type'] = $p['status_type'];
-	$posts[$i]['created_time'] = (isset($p['created_time'])?date('Y-m-d H:i:s', strtotime($p['created_time'])):'');
+      if (isset($p['status_type']) && ($p['status_type']=='shared_story' || $p['status_type']=='wall_post' || $p['status_type']=='approved_friend')) {
+				$i = count($posts);
+				if (isset($p['id'])) {
+					$post_id = explode('_', $p['id']);
+					$posts[$i]['post_fb_id'] = $post_id[1];
+				} else
+					$posts[$i]['post_fb_id'] = '';
+					$posts[$i]['type'] = $p['status_type'];
+					$posts[$i]['created_time'] = (isset($p['created_time'])?date('Y-m-d H:i:s', strtotime($p['created_time'])):'');
 	
 	//table: user_post_tags
 	$posts[$i]['tags'] = array();
@@ -313,7 +313,7 @@ function send_data($userInfo, $userData) {
 	
 	//table: user_post_comments
 	$posts[$i]['comments'] = array();
-	if (isset($p['comments']) && ($pc['count'] != '0')) {
+	if (isset($p['comments']) && ($p['comments']['count'] != '0')) {
 	  foreach ($p['comments']['data'] as $pc) {
 	    $z = count($posts[$i]['comments']);
 	    $posts[$i]['comments'][$z] = array();
@@ -532,7 +532,7 @@ function send_data($userInfo, $userData) {
   }
   foreach($locations as $l) {
     if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_locations WHERE user_id = '$user_id' AND created_time = '$l[created_time]' AND location_name = '$l[location_name]'"), 0))) {
-      $q9 = mysql_query("INSERT INTO user_locations (user_id, created_time, location_name, street, city, state, country, zip, latitude, longitude) VALUES ('$user_id', '$l[created_time]', '$l[location_name]', '$l[street]', '$l[city]', '$l[state]', '$l[country]', '$l[zip]', '$l[latitude]', '$l[longitude]')");
+      $q9 = mysql_query("INSERT INTO user_locations (user_id, created_time, location_name, street, city, state, country, zip, latitude, longitude) VALUES ('$user_id', '$l[created_time]', '$l[location_name]', '$l[street]', '$l[city]', '$l[state]', '$l[country]', '$l[zip]', '$l[latitude]', '$l[longitude]')") or die(mysql_error());
       if(!$q9)
  	break;
     }
@@ -541,7 +541,7 @@ function send_data($userInfo, $userData) {
     if ($ser['id']) {
       $subscriber_id = check_user($ser['id']);
       if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$user_id' AND subscriber_id = '$subscriber_id'"), 0))) {
-	$q10 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$user_id', '$subscriber_id')");
+	$q10 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$user_id', '$subscriber_id')") or die(mysql_error());
 	if(!$q10)
 	  break;
       }
@@ -550,11 +550,37 @@ function send_data($userInfo, $userData) {
   foreach($userData['subscribedto']['data'] as $sto) {
     if ($sto['id']) {
       $subscribedto_id = check_user($sto['id']);
-      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$subscribedto_id', '$user_id'"), 0))) {
-	$q11 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$subscribedto_id', '$user_id')");
+      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_subscribers WHERE user_id = '$subscribedto_id' AND subscriber_id = '$user_id'"), 0))) {
+	$q11 = mysql_query("INSERT INTO user_subscribers (user_id, subscriber_id) VALUES ('$subscribedto_id', '$user_id')") or die(mysql_error());
 	if(!$q11)
 	  break;
       }
+    }
+  }
+	
+  if (isset($userData['friendlists'])) {
+    foreach($userData['friendlists']['data'] as $f) {
+      if (isset($f['members']) && isset($f['id'])) {
+				$id = $f['id'];
+				if(!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_friendlists WHERE list_fb_id = '$id'"), 0))) {
+					$name = (isset($f['name'])?$f['name']:'');
+					$type = (isset($f['list_type'])?$f['list_type']:'');
+					$q12 = mysql_query("INSERT INTO user_friendlists (list_fb_id, user_id, name, type) VALUES ('$id', '$user_id', '$name', '$id')") or die(mysql_error());
+					if (!$sql)
+						break;
+				}
+				$list_id = mysql_result(mysql_query("SELECT list_id FROM user_friendlists WHERE list_fb_id = $id"), 0);
+				foreach($f['members']['data'] as $m) {
+					if($m['id']) {
+						$member_id = check_user($m['id']);
+						if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_friendlist_members WHERE list_id = '$list_id' AND member_id = '$member_id'"), 0))) {
+							$sq = mysql_query("INSERT INTO user_friendlist_members (list_id, member_id) VALUES ('$list_id', '$member_id')") or die(mysql_error());
+							if (!$sq)
+								break;
+						}
+					}
+				}
+			}
     }
   }
 
