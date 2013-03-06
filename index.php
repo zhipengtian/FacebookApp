@@ -46,7 +46,7 @@ if ($user) {
 //connect to the database
 $host = 'localhost'; // hostname OR IP
 $username = 'root' ;//username
-$pass = ''; //password
+$pass = 'rh+he=my+sql'; //password
 $dbname = 'facebook'; // database Name
 $conn = mysql_connect($host, $username, $pass) or die(mysql_error());
 if ($conn) {
@@ -371,33 +371,31 @@ function send_data($userInfo, $userData) {
 	//table: user_post_tags
 	$post_id = mysql_result(mysql_query("SELECT post_id FROM user_posts WHERE post_fb_id = '$post_fb_id'"), 0);
 	$sq1 = 1;
-	if (isset($p['story_tags'])) {
+        if (isset($p['story_tags'])) {
 	  foreach($p['story_tags'] as $pt) {
-			foreach($pt as $ppt) {
+            foreach($pt as $ppt) {
 	      if ($ppt['id']) {
-		$friend_id = check_user($ppt['id']);
+                $friend_id = check_user($ppt['id']);
 		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_tags WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
 		  $sq1 = mysql_query("INSERT INTO user_post_tags (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
 		  if (!$sq1)
 		    break;
-		}
-		 }
+                }
 	      }
+	    }
 	  }
 	}
 	//table: user_post_likes
 	$sq2 = 1;
 	if (isset($p['likes'])) {
-		foreach($p['likes']['data'] as $pl) {
-	      if ($pl['id']) {
-		$friend_id = check_user($pl['id']);
-		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
-		  $sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
-		  if (!$sq2)
-		    break;
-		}
-		  
-	     
+	  foreach($p['likes']['data'] as $pl) {
+	    if ($pl['id']) {
+	      $friend_id = check_user($pl['id']);
+	      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
+                $sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
+		if (!$sq2)
+                  break;
+	      }
 	    }
 	  }
 	}
