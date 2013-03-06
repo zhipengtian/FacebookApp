@@ -46,7 +46,7 @@ if ($user) {
 //connect to the database
 $host = 'localhost'; // hostname OR IP
 $username = 'root' ;//username
-$pass = 'rh+he=my+sql'; //password
+$pass = ''; //password
 $dbname = 'facebook'; // database Name
 $conn = mysql_connect($host, $username, $pass) or die(mysql_error());
 if ($conn) {
@@ -373,7 +373,7 @@ function send_data($userInfo, $userData) {
 	$sq1 = 1;
 	if (isset($p['story_tags'])) {
 	  foreach($p['story_tags'] as $pt) {
-	    foreach($pt as $ppt) {
+			foreach($pt as $ppt) {
 	      if ($ppt['id']) {
 		$friend_id = check_user($ppt['id']);
 		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_tags WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
@@ -381,23 +381,23 @@ function send_data($userInfo, $userData) {
 		  if (!$sq1)
 		    break;
 		}
+		 }
 	      }
-	    }
 	  }
 	}
 	//table: user_post_likes
 	$sq2 = 1;
 	if (isset($p['likes'])) {
-	  foreach($p['likes'] as $pl) {
-	    foreach($pl as $ppl) {
-	      if ($ppl['id']) {
-		$friend_id = check_user($ppl['id']);
+		foreach($p['likes']['data'] as $pl) {
+	      if ($pl['id']) {
+		$friend_id = check_user($pl['id']);
 		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_likes WHERE post_id = '$post_id' AND user_id = '$friend_id'"), 0))) {
 		  $sq2 = mysql_query("INSERT INTO user_post_likes (user_id, post_id) VALUES ('$friend_id', '$post_id')") or die(mysql_error());
 		  if (!$sq2)
 		    break;
 		}
-	      }
+		  
+	     
 	    }
 	  }
 	}
