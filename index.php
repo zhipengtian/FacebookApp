@@ -291,16 +291,16 @@ function send_data($userInfo, $userData) {
     foreach($userData['albums']['data'] as $a) {
       foreach($a['photos']['data'] as $p) {
 	if (isset($p['tags']) || isset($p['likes']) || isset($p['comments'])) {
-	  $fb_id = (isset($p['id'])?$p['id']:'');
+	  $photo_fb_id = (isset($p['id'])?$p['id']:'');
 	  $created_time = (isset($p['created_time'])?date('Y-m-d H:i:s', strtotime($p['created_time'])):'');
 	  $place = (isset($p['place'])?addslashes($p['place']['name']):'');
-	  if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photos WHERE photo_fb_id = '$fb_id'"), 0))) {
-	    $q7 = mysql_query("INSERT INTO user_photos (photo_fb_id, user_id, created_time, place) VALUES ('$fb_id', '$user_id', '$created_time', '$place')") or die(mysql_error());
+	  if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photos WHERE photo_fb_id = '$photo_fb_id'"), 0))) {
+	    $q7 = mysql_query("INSERT INTO user_photos (photo_fb_id, user_id, created_time, place) VALUES ('$photo_fb_id', '$user_id', '$created_time', '$place')") or die(mysql_error());
 	    if (!$q7)
 	      break;
 	  }
 	  //table: user_photo_tags
-	  $photo_id = mysql_result(mysql_query("SELECT photo_id FROM user_photos WHERE photo_fb_id = '$fb_id'"), 0);
+	  $photo_id = mysql_result(mysql_query("SELECT photo_id FROM user_photos WHERE photo_fb_id = '$photo_fb_id'"), 0);
 	  $sq1 = 1;
 	  if (isset($p['tags'])) {
 	    foreach($p['tags']['data'] as $pt) {
@@ -332,14 +332,16 @@ function send_data($userInfo, $userData) {
 	  $sq3 = 1;
 	  if (isset($p['comments'])) {
 	    foreach($p['comments']['data'] as $pc) {
-	      if ($pc['id']) {
-		$friend_id = check_user($pc['id']);
-		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_comments WHERE photo_id = '$photo_id' AND comment_fb_id = '$pc[id]'"), 0))) {
+	      if ($pc['from']['id'] && $pc['id']) {
+		$friend_id = check_user($pc['from']['id']);
+		$comment_id = explode('_', $pc['id']);
+		$comment_fb_id = $comment_id[1];
+		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_photo_comments WHERE photo_id = '$photo_id' AND comment_fb_id = '$comment_fb_id'"), 0))) {
 		  $created_time = (isset($pc['created_time'])?date('Y-m-d H:i:s', strtotime($pc['created_time'])):'');
 		  $message = (isset($pc['message'])?addslashes($pc['message']):'');
 		  $like_count = (isset($pc['like_count'])?$pc['like_count']:'');
 		  $user_likes = (isset($pc['user_likes'])?$pc['user_likes']:'0');
-		  $sq3 = mysql_query("INSERT INTO user_photo_comments (comment_fb_id, user_id, photo_id, created_time, content, like_count, user_likes) VALUES ('$pc[id]', '$friend_id', '$photo_id', '$created_time', '$message', '$like_count', '$user_likes')") or die(mysql_error());
+		  $sq3 = mysql_query("INSERT INTO user_photo_comments (comment_fb_id, user_id, photo_id, created_time, content, like_count, user_likes) VALUES ('$comment_fb_id', '$friend_id', '$photo_id', '$created_time', '$message', '$like_count', '$user_likes')") or die(mysql_error());
 		  if (!$sq3)
 		    break;
 		}
@@ -403,7 +405,7 @@ function send_data($userInfo, $userData) {
 	$sq3 = 1;
 	if (isset($p['comments']) && $p['comments']['count'] != 0) {
 	  foreach($p['comments']['data'] as $pc) {
-	    if ($pc['from']['id']) {
+	    if ($pc['from']['id'] && $pc['id']) {
 	      $friend_id = check_user($pc['from']['id']);
 	      $comment_id = explode('_', $pc['id']);
 	      $comment_fb_id = $comment_id[2];
