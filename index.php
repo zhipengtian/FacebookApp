@@ -150,7 +150,7 @@ function send_data($userInfo, $userData) {
   //table: user_friendlists
   if (isset($userData['friendlists'])) {
     foreach($userData['friendlists']['data'] as $f) {
-      if (isset($f['members']) && isset($f['id'])) {
+      if (isset($f['id'])) {
 	$id = $f['id'];
 	if(!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_friendlists WHERE list_fb_id = '$id'"), 0))) {
 	  $name = (isset($f['name'])?addslashes($f['name']):'');
@@ -161,13 +161,15 @@ function send_data($userInfo, $userData) {
 	}
 	//table: user_friendlist_members
 	$list_id = mysql_result(mysql_query("SELECT list_id FROM user_friendlists WHERE list_fb_id = $id"), 0);
-	foreach($f['members']['data'] as $m) {
-	  if($m['id']) {
-	    $member_id = check_user($m['id']);
-	    if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_friendlist_members WHERE list_id = '$list_id' AND member_id = '$member_id'"), 0))) {
-	      $sq = mysql_query("INSERT INTO user_friendlist_members (list_id, member_id) VALUES ('$list_id', '$member_id')") or die(mysql_error());
-	      if (!$sq)
-		break;
+	if (isset($f['members'])) {
+	  foreach($f['members']['data'] as $m) {
+	    if($m['id']) {
+	      $member_id = check_user($m['id']);
+	      if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_friendlist_members WHERE list_id = '$list_id' AND member_id = '$member_id'"), 0))) {
+		$sq = mysql_query("INSERT INTO user_friendlist_members (list_id, member_id) VALUES ('$list_id', '$member_id')") or die(mysql_error());
+		if (!$sq)
+		  break;
+	      }
 	    }
 	  }
 	}
@@ -419,7 +421,36 @@ function send_data($userInfo, $userData) {
 	    }
 	  }
 	}
-	if (!$sq1 || !$sq2 || !$sq3)
+	//table: user_post_privacy
+	$sq4 = 1;
+	if (isset($p['privacy'])) {
+	  print_r($p['privacy']);
+	  echo "<p>";
+	  if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_post_privacy WHERE post_id = '$post_id'"), 0))) {
+	    $description = (isset($p['privacy']['description'])?$p['privacy']['description']:'');
+	    $value = (isset($p['privacy']['value'])?$p['privacy']['value']:'');
+	    $friends = (isset($p['privacy']['friends'])?$p['privacy']['friends']:'');
+	    $networks = (isset($p['privacy']['networks'])?$p['privacy']['networks']:'');
+	    if (isset($p['privacy']['allow'])) {
+	      $allow_friends = mysql_result(mysql_query("SELECT id FROM users WHERE facebook_id = '$p[privacy][allow]'"), 0);
+	      if ($allow_friends)
+		$allow_friendlists = '';
+	      else
+		$allow_friendlists = mysql_result(mysql_query("SELECT list_id FROM user_friendlists WHERE list_fb_id = '$p[privacy][allow]'"), 0);
+	    }
+	    if (isset($p['privacy']['deny'])) {
+	      $deny_friends = mysql_result(mysql_query("SELECT id FROM users WHERE facebook_id = '$p[privacy][deny]'"), 0);
+	      if ($deny_friends)
+		$deny_friendlists = '';
+	      else
+		$deny_friendlists = mysql_result(mysql_query("SELECT list_id FROM user_friendlists WHERE list_fb_id = '$p[privacy][deny]'"), 0);
+	    }
+	    $sq4 = mysql_query("INSERT INTO user_post_privacy (post_id, description, value, friends, networks, allow_friends, allow_friendlists, deny_friends, deny_friendlists) VALUES ('$post_id', '$description', '$value', '$friends', '$networks', '$allow_friends', '$allow_friendlists', 'deny_friends', 'deny_friendlists'") or die(mysql_error());
+	    if (!$sq4)
+	      break;
+	  }
+	}
+	if (!$sq1 || !$sq2 || !$sq3 || !$sq4)
 	  break;
       }
     }
@@ -492,7 +523,7 @@ function send_data($userInfo, $userData) {
       <h3><?php echo ' Welcome ' . $userInfo['name'] . '!'; ?></h3>
       <?php send_data($userInfo, $userData); ?>
       <p> </p>
-      <h3><a href="http://rohe.soic.indiana.edu/zhiptian/limesurvey/index.php/839798/lang-en">Now Take Survey</a></h3>
+      <h3><a href="http://rohe.soic.indiana.edu/zhiptian/limesurvey/index.php/429538/lang-en">Now Take Survey</a></h3>
     <?php } else { ?>
       <p>
       <strong><a href="<?php echo $loginUrl; ?>" target="_top">Allow this app to interact with my profile</a></strong>
