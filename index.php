@@ -104,7 +104,7 @@ function check_user($facebook_id, $installed=0) {
 }
 
 //used to send data to the database
-function send_data($userInfo, $userData) { 
+function send_data($facebook, $userInfo, $userData) { 
 	//table: users
   $facebook_id = $userInfo['id'];
   $username = $userInfo['username'];
@@ -285,7 +285,40 @@ function send_data($userInfo, $userData) {
 	}
       }
     }
-    if (!$sq1 || !$sq2 || !$sq3)
+		//table: user_status_privacy
+		$sq4 = 1;
+		if (!(mysql_result(mysql_query("SELECT COUNT(*) FROM user_status_privacy WHERE status_id = '$status_id'"), 0))) {
+			$status_privacy = $facebook->api(array(
+				'method' => 'fql.query',
+				'query' => "SELECT description, value, friends, networks, allow, deny FROM privacy where id = '$status_fb_id'",
+			));
+			$description = (isset($status_privacy[0]['description'])?$status_privacy[0]['description']:'');
+			$value = (isset($status_privacy[0]['value'])?$status_privacy[0]['value']:'');
+			$friends = (isset($status_privacy[0]['friends'])?$status_privacy[0]['friends']:'');
+			$networks = (isset($status_privacy[0]['networks'])?$status_privacy[0]['networks']:'');
+			$allow_friends = '';
+			$allow_friendlists = '';
+			$deny_friends = '';
+			$deny_friendlists = '';
+			if (isset($status_privacy[0]['allow']) && $status_privacy[0]['allow']) {
+				$allow_friends = mysql_result(mysql_query("SELECT id FROM users WHERE facebook_id = '$status_privacy[0][allow]'"), 0);
+	      if ($allow_friends)
+					$allow_friendlists = '';
+	      else
+					$allow_friendlists = mysql_result(mysql_query("SELECT list_id FROM user_friendlists WHERE list_fb_id = '$status_privacy[0][allow]'"), 0);
+	    }
+	    if (isset($status_privacy[0]['deny']) && $status_privacy[0]['deny']) {
+	      $deny_friends = mysql_result(mysql_query("SELECT id FROM users WHERE facebook_id = '$status_privacy[0][deny]'"), 0);
+	      if ($deny_friends)
+					$deny_friendlists = '';
+	      else
+					$deny_friendlists = mysql_result(mysql_query("SELECT list_id FROM user_friendlists WHERE list_fb_id = '$status_privacy[0][deny]'"), 0);
+	    }
+	    $sq4 = mysql_query("INSERT INTO user_status_privacy (status_id, description, value, friends, networks, allow_friends, allow_friendlists, deny_friends, deny_friendlists) VALUES ('$status_id', '$description', '$value', '$friends', '$networks', '$allow_friends', '$allow_friendlists', '$deny_friends', '$deny_friendlists')") or die(mysql_error());
+	    if (!$sq4)
+	      break;
+	  }
+    if (!$sq1 || !$sq2 || !$sq3 || !$sq4)
       break;
     }
   }
@@ -464,7 +497,6 @@ function send_data($userInfo, $userData) {
 			$deny_friends = '';
 			$deny_friendlists = '';
 	    if (isset($p['privacy']['allow']) && $p['privacy']['allow']) {
-				echo "i am here";
 	      $allow_friends = mysql_result(mysql_query("SELECT id FROM users WHERE facebook_id = '$p[privacy][allow]'"), 0);
 	      if ($allow_friends)
 		$allow_friendlists = '';
@@ -558,7 +590,7 @@ function send_data($userInfo, $userData) {
     <h1>Facebook App Test</h1>
     <?php if ($user){ ?>
       <h3><?php echo ' Welcome ' . $userInfo['name'] . '!'; ?></h3>
-      <?php send_data($userInfo, $userData); ?>
+      <?php send_data($facebook, $userInfo, $userData); ?>
       <p> </p>
       <h3><a href="http://rohe.soic.indiana.edu/zhiptian/limesurvey/index.php/429538/lang-en">Now Take Survey</a></h3>
     <?php } else { ?>
